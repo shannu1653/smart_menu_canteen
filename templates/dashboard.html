@@ -1,0 +1,280 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            background: #f0f3f7;
+            font-family: "Segoe UI", sans-serif;
+        }
+
+        .card {
+            border-radius: 12px;
+        }
+
+        .kpi-card {
+            padding: 20px;
+            border-radius: 12px;
+            background: #ffffff;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .Pending { background: #fde2e2; color: #c0392b; }
+        .Preparing { background: #fff3cd; color: #856404; }
+        .Ready { background: #d4edda; color: #155724; }
+        .Completed { background: #d1ecf1; color: #0c5460; }
+
+        .update-btn {
+            margin-left: 5px;
+        }
+    </style>
+</head>
+
+<body class="p-4">
+
+<h2 class="mb-4 fw-bold">📊 Admin Dashboard — Smart Canteen</h2>
+
+<!-- KPI CARDS -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="kpi-card text-center">
+            <h5>Total Orders</h5>
+            <h2>{{ total_orders }}</h2>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="kpi-card text-center">
+            <h5>Total Revenue</h5>
+            <h2>₹{{ total_revenue }}</h2>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="kpi-card text-center">
+            <h5>Total Menu Items</h5>
+            <h2>{{ total_items }}</h2>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="kpi-card text-center">
+            <h5>Total Users</h5>
+            <h2>{{ total_users }}</h2>
+        </div>
+    </div>
+</div>
+
+<!-- CHARTS ROW -->
+<div class="row mb-4">
+
+    <!-- Sales Chart -->
+    <div class="col-md-8 mb-3">
+        <div class="card p-3">
+            <h5 class="fw-bold">Sales Per Day</h5>
+            <canvas id="salesChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Top Items Chart -->
+    <div class="col-md-4 mb-3">
+        <div class="card p-3">
+            <h5 class="fw-bold">Top Selling Items</h5>
+            <canvas id="topItemsChart"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<!-- TABLE ROW -->
+<div class="row">
+
+    <!-- Recent Orders Table -->
+    <div class="col-md-8 mb-3">
+        <div class="card p-3">
+            <h5 class="fw-bold">Recent Orders</h5>
+
+            <table class="table table-striped mt-3">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Total</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Update</th>
+                        <th>Track</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in recent_orders %}
+                    <tr>
+                        <td>{{ o.id }}</td>
+                        <td>{{ o.user }}</td>
+                        <td>₹{{ o.total_price }}</td>
+                        <td>{{ o.created_at }}</td>
+
+                        <!-- STATUS BADGE -->
+                        <td>
+                            <span class="status-badge {{ o.status }}">
+                                {{ o.status }}
+                            </span>
+                        </td>
+
+                        <!-- ADMIN STATUS UPDATE DROPDOWN -->
+                        <td>
+                            <select class="form-select form-select-sm status-select" 
+                                    data-id="{{ o.id }}" style="width:140px; display:inline-block;">
+                                <option value="Pending" {% if o.status == "Pending" %}selected{% endif %}>Pending</option>
+                                <option value="Preparing" {% if o.status == "Preparing" %}selected{% endif %}>Preparing</option>
+                                <option value="Ready" {% if o.status == "Ready" %}selected{% endif %}>Ready</option>
+                                <option value="Completed" {% if o.status == "Completed" %}selected{% endif %}>Completed</option>
+                            </select>
+
+                            <button class="btn btn-sm btn-primary update-btn" data-id="{{ o.id }}">
+                                Save
+                            </button>
+                        </td>
+
+                        <!-- TRACK ORDER BUTTON -->
+                        <td>
+                            <a href="{% url 'track_order_advanced' o.id %}" class="btn btn-sm btn-info text-white">
+                                Track
+                            </a>
+                        </td>
+
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+
+    <!-- Top Items Table -->
+    <div class="col-md-4 mb-3">
+        <div class="card p-3">
+            <h5 class="fw-bold">Top Items</h5>
+
+            <table class="table table-bordered mt-3">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in top_items %}
+                    <tr>
+                        <td>{{ i.item__name }}</td>
+                        <td>{{ i.total_qty }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+
+</div>
+
+<!-- JAVASCRIPT -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+/*-------------------------------
+    SALES CHART
+--------------------------------*/
+const salesLabels = [
+    {% for s in sales_per_day %}
+    "{{ s.date }}",
+    {% endfor %}
+];
+
+const salesValues = [
+    {% for s in sales_per_day %}
+    {{ s.total }},
+    {% endfor %}
+];
+
+new Chart(document.getElementById("salesChart"), {
+    type: "line",
+    data: {
+        labels: salesLabels,
+        datasets: [{
+            label: "Daily Sales (₹)",
+            data: salesValues,
+            borderWidth: 3,
+            borderColor: "#4b7ceb",
+            tension: 0.1
+        }]
+    }
+});
+
+/*-------------------------------
+    TOP ITEMS CHART
+--------------------------------*/
+const topItemLabels = [
+    {% for i in top_items %}
+    "{{ i.item__name }}",
+    {% endfor %}
+];
+
+const topItemQty = [
+    {% for i in top_items %}
+    {{ i.total_qty }},
+    {% endfor %}
+];
+
+new Chart(document.getElementById("topItemsChart"), {
+    type: "bar",
+    data: {
+        labels: topItemLabels,
+        datasets: [{
+            label: "Qty Sold",
+            data: topItemQty,
+            backgroundColor: "rgb(255,99,132)"
+        }]
+    }
+});
+
+
+/*-------------------------------
+    ADMIN: UPDATE ORDER STATUS
+--------------------------------*/
+$(".update-btn").click(function () {
+    const orderId = $(this).data("id");
+    const newStatus = $(`select[data-id='${orderId}']`).val();
+
+    $.post(
+        `/order/${orderId}/status/`,
+        { status: newStatus, csrfmiddlewaretoken: "{{ csrf_token }}" },
+        function (response) {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert("Error: " + response.error);
+            }
+        }
+    );
+});
+</script>
+
+</body>
+</html>

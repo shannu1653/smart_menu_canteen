@@ -1,0 +1,190 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Track Order #{{ order.id }}</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        body { background:#f5f7fa; padding:30px; font-family: Arial, sans-serif; }
+
+        .track-box {
+            max-width: 720px;
+            margin: auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+        }
+
+        .step-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 25px;
+        }
+
+        .step {
+            text-align: center;
+            width: 22%;
+        }
+
+        .step .circle {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            margin: auto;
+            margin-bottom: 8px;
+            background: #eaeaea;
+            color: #555;
+        }
+
+        .step.active .circle {
+            background: #0ea5a4;
+            color: #fff;
+            box-shadow: 0 0 10px rgba(14,165,164,0.6);
+        }
+
+        .step.done .circle {
+            background: #06b6d4;
+            color: #fff;
+        }
+
+        .progress-bar-wrapper {
+            height: 12px;
+            background: #dde1e7;
+            border-radius: 50px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #06b6d4, #0ea5a4);
+            transition: width .5s ease-out;
+        }
+
+        .status-badge {
+            font-size: 1rem;
+            padding: 6px 14px;
+            border-radius: 6px;
+            background: #0ea5a4;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .admin-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #eefaff;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="track-box">
+
+    <h3 class="mb-3">🚚 Order Tracking — #{{ order.id }}</h3>
+
+    <p>
+        Current Status: 
+        <span id="statusBadge" class="status-badge">{{ order.status }}</span>
+    </p>
+
+    <div class="step-row" id="steps">
+        <div class="step" data-step="Pending">
+            <div class="circle">1</div>
+            Pending
+        </div>
+        <div class="step" data-step="Preparing">
+            <div class="circle">2</div>
+            Preparing
+        </div>
+        <div class="step" data-step="Ready">
+            <div class="circle">3</div>
+            Ready
+        </div>
+        <div class="step" data-step="Completed">
+            <div class="circle">4</div>
+            Completed
+        </div>
+    </div>
+
+    <div class="progress-bar-wrapper">
+        <div id="progressBar" class="progress-bar"></div>
+    </div>
+
+    <p id="lastUpdate" class="text-muted"></p>
+
+    {% if user.is_staff %}
+    <div class="admin-box">
+        <label>Admin: Change Status</label>
+        <div class="input-group">
+            <select id="adminStatus" class="form-select">
+                <option>Pending</option>
+                <option>Preparing</option>
+                <option>Ready</option>
+                <option>Completed</option>
+            </select>
+            <button id="adminSave" class="btn btn-primary">Save</button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    const orderId = {{ order.id }};
+    const statusApi = "/order-status/" + orderId + "/";
+    const updateApi = "/order/" + orderId + "/status/";
+
+    const progressMap = {
+        "Pending": 10,
+        "Preparing": 40,
+        "Ready": 75,
+        "Completed": 100
+    };
+
+    function updateUI(status) {
+        $("#statusBadge").text(status);
+
+        $("#steps .step").each(function() {
+            const step = $(this).data("step");
+            $(this).removeClass("active done");
+
+            if (step === status) $(this).addClass("active");
+            if (progressMap[step] < progressMap[status]) $(this).addClass("done");
+        });
+
+        $("#progressBar").css("width", progressMap[status] + "%");
+    }
+
+    setInterval(() => {
+        $.get(statusApi, function(resp) {
+            updateUI(resp.status);
+            $("#lastUpdate").text("Updated: " + new Date().toLocaleTimeString());
+        });
+    }, 2500);
+
+    $("#adminSave").click(() => {
+        $.post(updateApi, {
+            status: $("#adminStatus").val(),
+            csrfmiddlewaretoken: "{{ csrf_token }}"
+        }, function(resp) {
+            updateUI(resp.status);
+        });
+    });
+
+    updateUI("{{ order.status }}");
+</script>
+
+</body>
+</html>
