@@ -1,0 +1,5 @@
+/* enhancements/dark_mode.css */
+:root{ --bg:#fff; --text:#111827; --card:#fff; --primary:#0ea5a4; }
+[data-theme="dark"]{ --bg:#071025; --text:#e6eef6; --card:#0f1724; --primary:#06b6d4; }
+body{ background:var(--bg); color:var(--text); }
+.card{ background:var(--card); }
